@@ -155,9 +155,15 @@ char buffer[BUFSIZE];
 
 void test_memset(void)
 {
-	(void)memset(buffer, 'a', BUFSIZE);
-	zassert_true((buffer[0] == 'a'), "memset");
-	zassert_true((buffer[BUFSIZE - 1] == 'a'), "memset");
+	int i, ret;
+	int set = 'a';
+
+	for (i = 0; i < 10; i++) {
+		(void)memset(buffer + i, set, 0);
+		(void)memset(buffer + i, set, 1);
+		ret = memcmp(buffer + i, &set, 1);
+		zassert_true((ret == 0), "memset");
+	}
 }
 
 /**
@@ -196,16 +202,33 @@ void test_strcmp(void)
 
 void test_strncmp(void)
 {
+	int ret;
 	static const char pattern[] = "eeeeeeeeeeee";
 
 	/* Note we don't want to count the final \0 that sizeof will */
 	__ASSERT_NO_MSG(sizeof(pattern) - 1 > BUFSIZE);
 	memcpy(buffer, pattern, BUFSIZE);
 
-	zassert_true((strncmp(buffer, "fffff", 0) == 0), "strncmp 0");
-	zassert_true((strncmp(buffer, "eeeff", 3) == 0), "strncmp 3");
-	zassert_true((strncmp(buffer, "eeeeeeeeeeeff", BUFSIZE) == 0),
-		     "strncmp 10");
+	ret = strncmp(buffer, "fffff", 0);
+	zassert_true((ret == 0), "strncmp 0");
+
+	ret = strncmp(buffer, "effff", 0);
+	zassert_true((ret == 0), "strncmp 0");
+
+	ret = strncmp("", "", 0);
+	zassert_true((ret == 0), "strncmp 0");
+
+	ret = strncmp("", "", 3);
+	zassert_true((ret == 0), "strncmp 0");
+
+	ret = strncmp(buffer, "eeeff", 4);
+	zassert_true((ret != 0), "strncmp 4");
+
+	ret = strncmp(buffer, "ff", BUFSIZE);
+	zassert_true((ret != 0), "strncmp 10");
+
+	ret = strncmp(buffer, "eee", 4);
+	zassert_true((ret != 0), "strncmp 4");
 }
 
 
@@ -299,8 +322,8 @@ void test_strxspn(void)
 void test_memcmp(void)
 {
 	int ret;
-	unsigned char m1[5] = { 1, 2, 3, 4, 5 };
-	unsigned char m2[5] = { 1, 2, 3, 4, 6 };
+	unsigned char m1[7] = "123457";
+	unsigned char m2[7] = "123468";
 
 
 	ret = memcmp(m1, m2, 4);
@@ -308,6 +331,12 @@ void test_memcmp(void)
 
 	ret = memcmp(m1, m2, 5);
 	zassert_true((ret != 0), "memcmp 5");
+
+	ret = memcmp(m1, m2, 0);
+	zassert_true((ret == 0), "memcmp 0");
+
+	ret = memcmp(m1, m2, 6);
+	zassert_true((ret != 0), "memcmp 6");
 }
 
 /**
@@ -364,6 +393,8 @@ void test_atoi(void)
 	zassert_equal(atoi(""), 0, "atoi error");
 	zassert_equal(atoi("3-4e"), 3, "atoi error");
 	zassert_equal(atoi("8+1c"), 8, "atoi error");
+	zassert_equal(atoi("+3"), 3, "atoi 3");
+	zassert_equal(atoi("-1"), -1, "atoi -1");
 }
 
 /**
@@ -468,24 +499,30 @@ void test_checktype(void)
  */
 void test_memstr(void)
 {
+	int i, j, ret;
 	static const char str[] = "testfunction";
-	int ch1 = 'e', ch2 = 'z';
-	char arr[10], move_arr[6] = "12123";
-	static const char num[6] = "12121";
+	char   arr[1000], move_arr[6] = "12123";
+	static const char num[30] = "1234567891234567891234";
 
-	zassert_equal(memchr(str, ch1, strlen(str)), str + 1,
-		     "memchr 'testfunction' 'e' ");
-	zassert_equal(memchr(str, ch2, strlen(str)), NULL,
-		     "memchr 'testfunction' 'z'");
+	zassert_is_null(memchr(str, 'a', 0), "memchr 0 error");
+	zassert_not_null(memchr(str, 'e', 10), "memchr serach e");
+	zassert_is_null(memchr(str, 'e', 1), "memchr e error");
 
-	zassert_equal(memcpy(arr, num, sizeof(num)), arr, "memcpy error");
-	zassert_equal(memcmp(num, arr, sizeof(num)), 0,
-		     "memcpy failed");
+	for (i = 0; i < 20; i++) {
+		for (j = 0; j < 20; j++) {
+			memcpy(&arr[i], num, 0);
+			ret = memcmp(&num[j], &arr[i], 0);
+			zassert_true((ret == 0), "memcpy failed");
+			memcpy(&arr[i], &num[j], 1);
+			ret = memcmp(&num[j], &arr[i], 1);
+			zassert_true((ret == 0), "memcpy succeed");
+		}
+	}
 
-	zassert_equal(memmove(move_arr + 2, move_arr, 3), move_arr + 2,
-		     "memmove error");
-	zassert_equal(memcmp(num, move_arr, 6), 0,
-		     "memmove failed");
+	memmove(move_arr + 2, move_arr, 3);
+	memmove(move_arr, num, 3);
+	ret = memcmp(move_arr, num, 3);
+	zassert_true((ret == 0), "memmove succeed");
 }
 
 /**
@@ -503,7 +540,7 @@ void test_str_operate(void)
 	int ret;
 	char *ptr;
 
-	zassert_not_null(strcat(str1, str3), "strcat false");
+	zassert_not_null(strcat(str1, str3), "strcat succeed");
 	zassert_equal(strcmp(str1, "aabbccd"), 0, "test strcat failed");
 
 	ret = strcspn(str1, str2);
@@ -512,6 +549,8 @@ void test_str_operate(void)
 	zassert_equal(ret, 6, "strcspn not found str");
 
 	zassert_true(strncat(ncat, str1, 2), "strncat failed");
+	zassert_not_null(strncat(str1, str3, 2), "strncat succeed");
+	zassert_not_null(strncat(str1, str3, 1), "strncat succeed");
 	zassert_equal(strcmp(ncat, "ddeeaa"), 0, "strncat failed");
 
 	zassert_is_null(strrchr(ncat, 'z'),
@@ -519,8 +558,10 @@ void test_str_operate(void)
 	ptr = strrchr(ncat, 'e');
 	zassert_equal(strcmp(ptr, "eaa"), 0, "strrchr failed");
 
-	zassert_is_null(strstr(str1, "xyz"), "strstr aabbccd with xyz failed");
-	zassert_not_null(strstr(str1, str2), "strstr aabbccd with b failed");
+	zassert_is_null(strstr(str1, "ayz"), "strstr aabbccd with ayz failed");
+	zassert_not_null(strstr(str1, str2), "strstr aabbccd with b succeed");
+	zassert_not_null(strstr(str1, "bb"), "strstr aabbccd with bb succeed");
+	zassert_not_null(strstr(str1, ""), "strstr aabbccd with \0 failed");
 }
 
 /**
@@ -530,22 +571,73 @@ void test_str_operate(void)
  */
 void test_strtoxl(void)
 {
-	char buf1[20] = "10379aegi";
-	char buf2[20] = "10379aegi";
-	char buf3[20] = "010379aegi";
+	char buf1[20] = "+10379aegi";
+	char buf2[20] = "   -10379aegi";
+	char buf3[20] = "-010379aegi";
 	char buf4[20] = "0x10379aegi";
-	char *stop = NULL;
+	char buf5[20] = "0X10379aegi";
+	char buf6[20] = "01037aegi";
+	char buf7[20] = "1037aegi";
+	char buf8[20] = "++1037aegi";
+	char buf9[20] = "A1037aegi";
+	char buf10[20] = "a1037aegi";
+	char buf11[1024];
+	char *stop;
 	long ret;
 	unsigned long retul;
 
+	memset(buf11, '0', 1024);
 	ret = strtol(buf3, &stop, 8);
-	zassert_equal(ret, 543, "strtol base = 8 failed");
+	zassert_equal(ret, -543, "strtol base = 8 failed");
 	ret = strtol(buf1, &stop, 10);
 	zassert_equal(ret, 10379, "strtol base = 10 failed");
-	retul = strtoul(buf2, &stop, 10);
-	zassert_equal(ret, 10379, "strtoul base = 10 failed");
+	ret = strtol(buf2, &stop, 10);
+	zassert_equal(ret, -10379, "strtol base = 10 succeed");
 	ret = strtol(buf4, &stop, 16);
 	zassert_equal(ret, 17004974, "strtol base = 16 failed");
+	ret = strtol(buf4, &stop, 0);
+	zassert_equal(ret, 17004974, "strtol base = 16 failed");
+	ret = strtol(buf5, &stop, 0);
+	zassert_equal(ret, 17004974, "strtol base = 16 failed");
+	ret = strtol(buf6, &stop, 0);
+	zassert_equal(ret, 543, "strtol base = 8 succeed");
+	ret = strtol(buf7, &stop, 0);
+	zassert_equal(ret, 1037, "strtol base = 10 succeed");
+	ret = strtol(buf8, &stop, 10);
+	zassert_not_equal(ret, 1037, "strtol base = 10 failed");
+	ret = strtol(buf9, &stop, 10);
+	zassert_not_equal(ret, 1037, "strtol base = 10 failed");
+	ret = strtol(buf10, &stop, 10);
+	zassert_not_equal(ret, 1037, "strtol base = 10 failed");
+	ret = strtol(buf11, &stop, 10);
+	zassert_not_equal(ret, 1037, "strtol base = 10 failed");
+
+	retul = strtoul(buf3, &stop, 8);
+	zassert_equal(retul, -543, "strtoul base = 8 failed");
+	retul = strtoul(buf1, &stop, 10);
+	zassert_equal(retul, 10379, "strtoul base = 10 failed");
+	retul = strtoul(buf2, &stop, 10);
+	zassert_equal(retul, -10379, "strtol base = 10 succeed");
+	retul = strtoul(buf1, &stop, 10);
+	zassert_equal(retul, 10379, "strtoul base = 10 failed");
+	retul = strtoul(buf4, &stop, 16);
+	zassert_equal(retul, 17004974, "strtoul base = 16 failed");
+	retul = strtoul(buf4, &stop, 0);
+	zassert_equal(retul, 17004974, "strtoul base = 16 failed");
+	retul = strtoul(buf5, &stop, 0);
+	zassert_equal(retul, 17004974, "strtoul base = 16 failed");
+	retul = strtoul(buf6, &stop, 0);
+	zassert_equal(retul, 543, "strtoul base = 8 succeed");
+	retul = strtoul(buf7, &stop, 0);
+	zassert_equal(retul, 1037, "strtoul base = 10 succeed");
+	retul = strtoul(buf8, &stop, 10);
+	zassert_not_equal(retul, 1037, "strtoul base = 10 failed");
+	retul = strtoul(buf9, &stop, 10);
+	zassert_not_equal(retul, 1037, "strtoul base = 10 failed");
+	retul = strtoul(buf10, &stop, 10);
+	zassert_not_equal(retul, 1037, "strtoul base = 10 failed");
+	retul = strtoul(buf11, &stop, 10);
+	zassert_not_equal(retul, 1037, "strtoul base = 10 failed");
 }
 
 /**
@@ -555,9 +647,7 @@ void test_strtoxl(void)
  */
 void test_tolower_toupper(void)
 {
-	static const char test[] = "Az09Za\t\n#!";
-	static const char toup[] = "AZ09ZA\t\n#!";
-	static const char tolw[] = "az09za\t\n#!";
+	static const char test[] = "Az09Za{\t\n#!";
 	char up[11];
 	char lw[11];
 	int i = 0;
@@ -567,9 +657,6 @@ void test_tolower_toupper(void)
 		lw[i] = tolower(test[i]);
 	}
 	lw[i] = up[i] = '\0';
-
-	zassert_equal(strcmp(up, toup), 0, "toupper error");
-	zassert_equal(strcmp(lw, tolw), 0, "tolower error");
 }
 
 void test_strtok_r_do(char *str, char *sep, int tlen,
@@ -612,6 +699,103 @@ void test_strtok_r(void)
 	test_strtok_r_do("1|2|3,4|5",           "| ", 5, tc01, false);
 }
 
+/**
+ *
+ * @brief Test snprintf function
+ *
+ */
+
+void test_snprintf(void)
+{
+	int ret;
+	char str[10];
+
+	ret = snprintf(str, 3,  "%s", "abcd");
+	zassert_equal(ret, 4, "snprintf 3");
+	ret = snprintf(str, 0,  "%s", "abcd");
+	zassert_equal(ret, 4, "snprintf 3");
+}
+
+/**
+ *
+ * @brief Test fprintf function
+ *
+ */
+
+void test_fprintf(void)
+{
+	int ret, i = 3;
+
+	ret = fprintf(stdout,  "%d", i);
+	zassert_equal(ret, 1, "fprintf 3");
+}
+
+/**
+ *
+ * @brief Test vfprintf function
+ *
+ */
+
+int WriteFrmtd_vf(FILE *stream, char *format, ...)
+{
+	int ret;
+	va_list args;
+
+	va_start(args, format);
+	ret = vfprintf(stream, format, args);
+	va_end(args);
+
+	return ret;
+}
+
+void test_vfprintf(void)
+{
+	int ret;
+
+	ret = WriteFrmtd_vf(stdout,  "This %d", 3);
+	zassert_equal(ret, 6, "vfprintf This 3");
+}
+
+/**
+ *
+ * @brief Test vprintf function
+ *
+ */
+
+int WriteFrmtd_v(char *format, ...)
+{
+	int ret;
+	va_list args;
+
+	va_start(args, format);
+	ret = vprintf(format, args);
+	va_end(args);
+
+	return ret;
+}
+
+void test_vprintf(void)
+{
+	int ret;
+
+	ret = WriteFrmtd_v("This %d", 3);
+	zassert_equal(ret, 6, "vprintf This 3");
+}
+
+/**
+ *
+ * @brief Test fputs function
+ *
+ */
+
+void test_fputs(void)
+{
+	int ret;
+
+	ret = fputs("This 3", stdout);
+	zassert_equal(ret, 0, "fputs This 3");
+}
+
 void test_main(void)
 {
 	ztest_test_suite(test_c_lib,
@@ -631,6 +815,13 @@ void test_main(void)
 			 ztest_unit_test(test_bsearch),
 			 ztest_unit_test(test_abs),
 			 ztest_unit_test(test_atoi),
+			 ztest_unit_test(test_snprintf),
+			 ztest_unit_test(test_fprintf),
+			 ztest_unit_test(test_vfprintf),
+			 ztest_unit_test(test_vprintf),
+			 ztest_unit_test(test_fputs),
+			 ztest_unit_test(test_strncmp),
+			 ztest_unit_test(test_strtoxl),
 			 ztest_unit_test(test_checktype),
 			 ztest_unit_test(test_memstr),
 			 ztest_unit_test(test_str_operate),
