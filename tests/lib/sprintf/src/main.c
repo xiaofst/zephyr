@@ -721,6 +721,95 @@ void test_sprintf_string(void)
 
 /**
  *
+ * @brief Test fprintf function
+ *
+ */
+
+void test_fprintf(void)
+{
+	int ret, i = 3;
+
+	ret = fprintf(stdout,  "%d", i);
+	zassert_equal(ret, 1, "fprintf failed!");
+
+	ret = printf("%d", 3);
+	zassert_equal(ret, 1, "printf failed!");
+}
+
+/**
+ *
+ * @brief Test vfprintf function
+ *
+ */
+
+int WriteFrmtd_vf(FILE *stream, char *format, ...)
+{
+	int ret;
+	va_list args;
+
+	va_start(args, format);
+	ret = vfprintf(stream, format, args);
+	va_end(args);
+
+	return ret;
+}
+
+void test_vfprintf(void)
+{
+	int ret;
+
+	ret = WriteFrmtd_vf(stdout,  "This %d", 3);
+	zassert_equal(ret, 6, "vfprintf This 3 failed");
+}
+
+/**
+ *
+ * @brief Test vprintf function
+ *
+ */
+
+int WriteFrmtd_v(char *format, ...)
+{
+	int ret;
+	va_list args;
+
+	va_start(args, format);
+	ret = vprintf(format, args);
+	va_end(args);
+
+	return ret;
+}
+
+void test_vprintf(void)
+{
+	int ret;
+
+	ret = WriteFrmtd_v("This %d", 3);
+	zassert_equal(ret, 6, "vprintf This 3 failed");
+}
+
+/**
+ *
+ * @brief Test fputs function
+ *
+ */
+
+void test_fputs(void)
+{
+	int ret;
+
+	ret = fputs("This 3", stdout);
+	zassert_equal(ret, 0, "fputs This 3 failed");
+
+	ret = fputs("This 3", NULL);
+	zassert_not_equal(ret, 0, "fputs This 3 failed");
+
+	ret = puts("This 3");
+	zassert_equal(ret, 0, "puts This 3 failed");
+}
+
+/**
+ *
  * @brief Test entry point
  *
  * @return N/A
@@ -734,6 +823,11 @@ void test_main(void)
 			 ztest_unit_test(test_vsprintf),
 			 ztest_unit_test(test_vsnprintf),
 			 ztest_unit_test(test_sprintf_string),
+			 ztest_unit_test(test_snprintf),
+			 ztest_unit_test(test_fprintf),
+			 ztest_unit_test(test_vfprintf),
+			 ztest_unit_test(test_vprintf),
+			 ztest_user_unit_test(test_fputs),
 			 ztest_unit_test(test_sprintf_misc));
 	ztest_run_test_suite(test_sprintf);
 }
